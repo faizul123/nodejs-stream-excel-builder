@@ -1,0 +1,15 @@
+
+Model
+
+ financial_id
+ channel_id
+ userNumber
+ filters
+ requestSourceType - internal / external
+ requestedDataType - unitary, bulk
+ submittedOn - timestamp
+ status - 100 , 200 , 300 , 400
+ retryMetaData - retry count, errorLog
+ completedOn - timestamp
+
+ 

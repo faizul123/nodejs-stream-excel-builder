@@ -1,6 +1,7 @@
 const { pipeline } = require('stream');
 const through2 = require('through2');
 var express = require('express');
+var promisfy = require('promi')
 var router = express.Router();
 const { JSONResponseStream, BatchTransformer, ExcelWriterTransform } = require('../stream');
 
@@ -12,36 +13,30 @@ router.get('/', function (req, res, next) {
 router.get('/download', function (req, res, next) {
   // Example usage with the pipeline method
   const jsonStream = new JSONResponseStream('http://localhost:3000/transactions');
-  const transformStreamObject = new BatchTransformer({
+  const batchTransformer = new BatchTransformer({
     highWaterMark: 4 * 1024
   });
   const excelWriterTransformer = new ExcelWriterTransform({
     highWaterMark: 4 * 1024
   })
 
-  function flush(cb) {
-    this.push('transformEnd');
-    return cb();
-  }
-  const transformer = through2(
-    { objectMode: true, allowHalfOpen: true },
-    transformStreamObject._transform.bind(transformStreamObject),
-    flush
-  );
-
+  console.log("start of pipeline");
   pipeline(
     jsonStream,
-    transformStreamObject,
+    batchTransformer,
     excelWriterTransformer,
-    process.stdout, // For demonstration, replace with a more suitable writable stream if needed
+   // uploadExcelStream
     (err) => {
       if (err) {
         console.error('Pipeline failed.', err);
       } else {
+        // update file generated completion status
         console.log('Pipeline completed successfully.');
       }
     }
-  );
+  )
+  console.log('end of pipeline');
+
   res.status(200).send({ 'processed': true });
 });
 

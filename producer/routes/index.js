@@ -26,6 +26,10 @@ router.get('/transactions', function (req, res, next) {
     res.end();
   });
 
+  router.post('/upload', function(req,res, next) {
+    
+  })
+
 });
 
 module.exports = router;

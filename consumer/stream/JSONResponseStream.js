@@ -5,33 +5,30 @@ const ndJSON = require('ndjson');
 // Custom Readable Stream class
 class JSONResponseStream extends Readable {
   constructor(url) {
-    super({ objectMode: true });
+    super({ objectMode: true, highWaterMark: 4 * 1024 });
     this.url = url;
+    this.counter = 1;
   }
 
   _read() {
-    http.get(this.url, (res) => {
-      res.pipe(ndJSON.parse())
-      .on('data', (chunk) => {
-        // console.log('chunk received');
-        // console.log(chunk);
-        this.push(JSON.stringify(chunk))
+    if (!this.request) {
+      this.request = http.get(this.url, (res) => {
+        const parsedStream = res.pipe(ndJSON.parse());
+        parsedStream.on('data', (chunk) => {
+          this.push(JSON.stringify(chunk));
+        });
+        parsedStream.on('end', () => {
+          console.log('End of parsed JSON stream');
+          this.push(null); // No more data to read
+        });
       });
-      res.on('end', () => {
-        try {
-          // const jsonData = JSON.parse(data);
-          // console.log(typeof jsonData);
-          // this.push(jsonData); // Push the JSON data into the stream
-          // console.log('time: ------> ', Date.now());
-        } catch (error) {
-          this.emit('error', error);
-        }
-        this.push(null); // No more data to read
+      this.request.on('error', (error) => {
+        this.emit('error', error);
       });
-    }).on('error', (error) => {
-      this.emit('error', error);
-    });
+    }
   }
+  
+  
 }
 
 module.exports = {
