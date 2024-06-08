@@ -1,9 +1,8 @@
 const { pipeline } = require('stream');
 const through2 = require('through2');
 var express = require('express');
-var promisfy = require('promi')
 var router = express.Router();
-const { JSONResponseStream, BatchTransformer, ExcelWriterTransform } = require('../stream');
+const { JSONResponseStream, BatchTransformer, ExcelWriterTransform, PrintStream,  } = require('../stream');
 
 /* GET home page. */
 router.get('/', function (req, res, next) {
@@ -12,7 +11,7 @@ router.get('/', function (req, res, next) {
 
 router.get('/download', function (req, res, next) {
   // Example usage with the pipeline method
-  const jsonStream = new JSONResponseStream('http://localhost:3000/transactions');
+  const jsonStream = new JSONResponseStream('http://localhost:3000/transactions',3);
   const batchTransformer = new BatchTransformer({
     highWaterMark: 4 * 1024
   });
@@ -23,7 +22,7 @@ router.get('/download', function (req, res, next) {
   console.log("start of pipeline");
   pipeline(
     jsonStream,
-    batchTransformer,
+   batchTransformer,
     excelWriterTransformer,
    // uploadExcelStream
     (err) => {

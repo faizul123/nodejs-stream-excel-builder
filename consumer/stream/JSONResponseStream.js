@@ -1,48 +1,60 @@
 const { Readable } = require('stream');
-const http = require('http');
+const axios = require('axios');
 const ndJSON = require('ndjson');
 
-// Custom Readable Stream class
+// Custom Readable Stream class with pagination
 class JSONResponseStream extends Readable {
-  constructor(url) {
-    super({ objectMode: true, highWaterMark: 4 * 1024 });
+  constructor(url, totalPages) {
+    super({ objectMode: true, highWaterMark: 12 * 1024 });
     this.url = url;
-    this.counter = 1;
+    this.totalPages = totalPages;
+    this.currentPage = 1;
+    this.activeRequests = 0; // Counter to track active HTTP requests
+    this.processing = false; // Flag to indicate if the current page is being processed
+  }
+
+  _fetchPage(page) {
+    this.activeRequests++;
+    const apiUrl = `${this.url}?page=${page}`;
+    const response = axios.default.get(apiUrl, {
+      responseType: 'stream'
+    }).then((res) => {
+      res.data.pipe(ndJSON.parse())
+        .on('data', (chunk) => {
+          this.push(JSON.stringify(chunk));
+        })
+        .on('end', () => {
+          this.activeRequests--;
+          this.processing = false; // Reset the processing flag
+          if (this.currentPage < this.totalPages && this.activeRequests === 0) {
+            this.currentPage++;
+            this._fetchNextPage();
+          } else if (this.activeRequests === 0) {
+            this.push(null);
+          }
+        })
+        .on('error', (error) => {
+          this.emit('error', error);
+        });
+    }).catch((error) => {
+      this.emit('error', error);
+    });
+  }
+
+  _fetchNextPage() {
+    if (!this.processing && this.currentPage <= this.totalPages) {
+      this.processing = true;
+      this._fetchPage(this.currentPage);
+    }
   }
 
   _read() {
-    if (!this.request) {
-      this.request = http.get(this.url, (res) => {
-        const parsedStream = res.pipe(ndJSON.parse());
-        parsedStream.on('data', (chunk) => {
-          this.push(JSON.stringify(chunk));
-        });
-        parsedStream.on('end', () => {
-          console.log('End of parsed JSON stream');
-          this.push(null); // No more data to read
-        });
-      });
-      this.request.on('error', (error) => {
-        this.emit('error', error);
-      });
+    if (!this.processing) {
+      this._fetchNextPage();
     }
   }
-  
-  
 }
 
 module.exports = {
   JSONResponseStream
-}
-
-// Using the custom stream
-// const jsonStream = new JSONResponseStream('https://api.example.com/data');
-// jsonStream.on('data', (data) => {
-//   console.log('Received data:', data);
-// });
-// jsonStream.on('end', () => {
-//   console.log('No more data.');
-// });
-// jsonStream.on('error', (error) => {
-//   console.error('Error:', error);
-// });
+};
